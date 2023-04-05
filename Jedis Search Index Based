@@ -1,0 +1,66 @@
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.schema.Schema;
+
+import java.util.List;
+
+public class RedisIndexSearch {
+    
+    public static void main(String[] args) {
+        
+        // Create a Jedis pool with default configuration
+        JedisPoolConfig config = new JedisPoolConfig();
+        JedisPool pool = new JedisPool(config, "localhost");
+        
+        // Create a Jedis instance
+        Jedis jedis = pool.getResource();
+        
+        // Define the index name
+        String indexName = "employees";
+        
+        // Define the index options
+        String[] indexOptions = {"SCHEMA", "name", "TEXT", "SORTABLE", "position", "TAG"};
+        
+        // Define the index schema
+        Schema schema = new Schema();
+        schema.addTextField("name").addTagField("position");
+        
+        // Create the index in Redis
+        String result = jedis.ftCreate(indexName, indexOptions, schema.getSchemaString());
+        System.out.println("FT.CREATE result: " + result);
+        
+        // Add some data to Redis with indexes
+        jedis.hset("employee:1", "name", "John Doe");
+        jedis.hset("employee:1", "position", "Manager");
+        jedis.ftAdd(indexName, "employee:1", 1.0, true);
+        
+        jedis.hset("employee:2", "name", "Jane Smith");
+        jedis.hset("employee:2", "position", "Sales Representative");
+        jedis.ftAdd(indexName, "employee:2", 1.0, true);
+        
+        jedis.hset("employee:3", "name", "Bob Johnson");
+        jedis.hset("employee:3", "position", "Developer");
+        jedis.ftAdd(indexName, "employee:3", 1.0, true);
+        
+        // Define the search criteria
+        String searchField = "position";
+        String searchValue = "Manager";
+        
+        // Search for employees matching the criteria
+        List<String> resultKeys = jedis.ftSearch(indexName, searchValue);
+        if (!resultKeys.isEmpty()) {
+            System.out.println("Found " + resultKeys.size() + " employees with " + searchField + " = " + searchValue + ":");
+            for (String key : resultKeys) {
+                List<String> employeeData = jedis.hmget(key, "name", "position");
+                System.out.println(" - Name: " + employeeData.get(0) + ", Position: " + employeeData.get(1));
+            }
+        } else {
+            System.out.println("No employees found with " + searchField + " = " + searchValue);
+        }
+        
+        // Release the Jedis instance and pool resources
+        jedis.close();
+        pool.close();
+    }
+}
