@@ -1,0 +1,97 @@
+import org.redisson.Redisson;
+import org.redisson.api.*;
+import org.redisson.api.search.*;
+import org.redisson.api.script.RScript;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class RedissonExample {
+    public static void main(String[] args) {
+        RedissonClient redisson = Redisson.create();
+
+        try {
+            // Clear any existing keys in the Redis database
+            RKeys keys = redisson.getKeys();
+            keys.flushdb();
+
+            // Insert list of Employee objects
+            List<Employee> employees = new ArrayList<>();
+            employees.add(new Employee("John Doe", 35, "Software Engineer"));
+            employees.add(new Employee("Jane Smith", 28, "Data Analyst"));
+            employees.add(new Employee("Bob Johnson", 42, "Manager"));
+
+            RList<Employee> employeeList = redisson.getList("employees");
+            employeeList.addAll(employees);
+
+            // Create Redis search index for Employee class
+            RScript script = redisson.getScript();
+            String createIndexScript = "redis.call('FT.CREATE', 'employees_index', 'ON', 'employees', 'SCHEMA', 'name', 'TEXT', 'age', 'NUMERIC', 'SORTABLE', 'position', 'TEXT');" ;
+            RFuture<Object> createIndexFuture = script.evalAsync(RScript.Mode.READ_WRITE, createIndexScript, RScript.ReturnType.VALUE);
+
+            createIndexFuture.get();
+
+            // Search for Employee objects based on age, name, and position
+            RSearch<Employee> employeeSearch = redisson.getSearch(employeeList);
+            RSearchResult<Employee> ageSearchResult = employeeSearch.search("age:42");
+            RSearchResult<Employee> nameSearchResult = employeeSearch.search("name:\"Bob Johnson\"");
+            RSearchResult<Employee> positionSearchResult = employeeSearch.search("position:Manager");
+
+            System.out.println("Search results by age:");
+            for (Employee employee : ageSearchResult) {
+                System.out.println(employee);
+            }
+
+            System.out.println("Search results by name:");
+            for (Employee employee : nameSearchResult) {
+                System.out.println(employee);
+            }
+
+            System.out.println("Search results by position:");
+            for (Employee employee : positionSearchResult) {
+                System.out.println(employee);
+            }
+
+            // Delete list of Employee objects
+            employeeList.delete();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            redisson.shutdown();
+        }
+    }
+}
+
+class Employee {
+    private String name;
+    private int age;
+    private String position;
+
+    public Employee(String name, int age, String position) {
+        this.name = name;
+        this.age = age;
+        this.position = position;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public String getPosition() {
+        return position;
+    }
+
+    @Override
+    public String toString() {
+        return "Employee{" +
+                "name='" + name +
+                "', age=" + age +
+                ", position='" + position + '\'' +
+                '}';
+    }
+}
