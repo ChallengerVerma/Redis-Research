@@ -1,0 +1,137 @@
+import org.redisson.Redisson;
+import org.redisson.api.RLiveObjectService;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
+
+import java.io.IOException;
+import java.util.List;
+
+public class RedissonExample {
+    public static void main(String[] args) throws IOException {
+        // Create a Redisson client instance using a single Redis server
+        Config config = new Config();
+        SingleServerConfig serverConfig = config.useSingleServer();
+        serverConfig.setAddress("redis://localhost:6379");
+        RedissonClient redisson = Redisson.create(config);
+
+        // Get the RLiveObjectService instance
+        RLiveObjectService liveObjectService = redisson.getLiveObjectService();
+
+        // Store a Person object in Redis
+        Person person = new Person();
+        person.setName("John Doe");
+        person.setAge(30);
+        person.setEmail("john.doe@example.com");
+        liveObjectService.persist(person);
+
+        // Search for all Person objects in Redis where the age is greater than 25
+        List<Person> persons = liveObjectService.find(Person.class, "age > ?", 25);
+        System.out.println("Found " + persons.size() + " Person objects where age is greater than 25");
+        for (Person p : persons) {
+            System.out.println(p.getName() + " (" + p.getEmail() + ")");
+        }
+        
+        RLiveObjectService liveObjectService = redissonClient.getLiveObjectService();
+
+/*// Define a search query
+RLiveObjectSearchResult<Person> result = liveObjectService.search(Person.class)
+    .where("name", "John")
+    .and("age", 30, SearchOperator.GREATER_THAN_OR_EQUAL_TO)
+    .execute();
+
+// Get the search results
+List<Person> persons = result.get();
+*/
+
+/*
+
+Yes, Redisson provides an alternative way to perform index-based search that may be more performant for large data sets.
+This is called the "Reactive Streams" API, and it allows you to perform searches asynchronously
+and process the results in a stream-like manner.
+
+RLiveObjectService liveObjectService = redissonClient.getLiveObjectService();
+
+// Define a search query
+RLiveObjectReactiveStreams<Person> reactiveStreams = liveObjectService.reactiveSearch(Person.class)
+        .where("name", "John")
+        .and("age", 30, SearchOperator.GREATER_THAN_OR_EQUAL_TO)
+        .reactive();
+
+// Subscribe to the results stream and process them as they arrive
+reactiveStreams.subscribe(new Subscriber<Person>() {
+    @Override
+    public void onSubscribe(Subscription subscription) {
+        // Request the first batch of results
+        subscription.request(10);
+    }
+
+    @Override
+    public void onNext(Person person) {
+        // Process the next result
+        System.out.println(person);
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+        // Handle errors
+        throwable.printStackTrace();
+    }
+
+    @Override
+    public void onComplete() {
+        // All results have been received
+    }
+});
+
+
+
+*/
+
+        // Close the Redisson client instance
+        redisson.shutdown();
+    }
+}
+
+// Person class
+public class Person implements RLiveObject {
+    private String name;
+    private int age;
+    private String email;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+}
+
+
+/*
+
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson-reactive</artifactId>
+    <version>3.16.0</version>
+</dependency>
+
+
+*/
