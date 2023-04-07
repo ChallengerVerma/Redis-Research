@@ -1,0 +1,54 @@
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import io.redisearch.Query;
+import io.redisearch.SearchResult;
+import io.redisearch.client.Client;
+import io.redisearch.client.IndexOptions;
+import io.redisearch.client.SearchOptions;
+import io.redisearch.client.SuggestionOptions;
+
+public class RedisSearchExample {
+  public static void main(String[] args) {
+    // Create a Jedis connection pool
+    JedisPoolConfig config = new JedisPoolConfig();
+    JedisPool pool = new JedisPool(config, "localhost", 6379);
+
+    // Create a RediSearch client
+    Client client = new Client("myIndex", pool);
+
+    // Define the index schema
+    IndexOptions indexOptions = new IndexOptions()
+        .addTextField("title", 1.0)
+        .addTextField("body", 0.5);
+
+    // Create the index
+    client.createIndex(indexOptions);
+
+    // Add some documents to the index
+    client.addDocument("doc1", new Document().set("title", "Hello World").set("body", "This is a test document"));
+    client.addDocument("doc2", new Document().set("title", "Redis Search").set("body", "Redis is a fast in-memory database"));
+
+    // Define the search query
+    Query query = new Query("redis");
+
+    // Define the search options
+    SearchOptions searchOptions = new SearchOptions().setWithScores().setWithPayloads().setLimit(0, 5);
+
+    // Perform the search
+    SearchResult searchResult = client.search(query, searchOptions);
+
+    // Print the search results
+    System.out.println("Total results: " + searchResult.totalResults);
+    for (Document doc : searchResult.docs) {
+      System.out.println("ID: " + doc.getId());
+      System.out.println("Score: " + doc.getScore());
+      System.out.println("Title: " + doc.getString("title"));
+      System.out.println("Body: " + doc.getString("body"));
+    }
+
+    // Close the RediSearch client and Jedis connection pool
+    client.close();
+    pool.close();
+  }
+}
