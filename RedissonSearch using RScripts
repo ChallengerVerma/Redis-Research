@@ -1,0 +1,33 @@
+import org.redisson.Redisson;
+import org.redisson.api.RScript;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+
+import java.util.List;
+
+public class RedissonRedisearchExample {
+    public static void main(String[] args) {
+        // Configure Redisson client
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://127.0.0.1:6379");
+        RedissonClient redisson = Redisson.create(config);
+
+        // Create index using Redisson's RScript API
+        RScript rScript = redisson.getScript();
+        String createIndexScript = "return redis.call('FT.CREATE', 'myIndex', 'SCHEMA', 'title', 'TEXT', 'content', 'TEXT')";
+        rScript.eval(RScript.Mode.READ_WRITE, createIndexScript);
+
+        // Add documents to the index
+        redisson.getBucket("doc1").set("{\"title\": \"Document 1\", \"content\": \"This is the content of document 1\"}");
+        redisson.getBucket("doc2").set("{\"title\": \"Document 2\", \"content\": \"This is the content of document 2\"}");
+        redisson.getBucket("doc3").set("{\"title\": \"Document 3\", \"content\": \"This is the content of document 3\"}");
+
+        // Search index using Redisson's RScript API
+        String searchScript = "return redis.call('FT.SEARCH', 'myIndex', 'hello world')";
+        List<String> searchResult = rScript.eval(RScript.Mode.READ_ONLY, searchScript);
+        System.out.println("Search result: " + searchResult);
+
+        // Shutdown Redisson client
+        redisson.shutdown();
+    }
+}
