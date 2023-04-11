@@ -1,0 +1,31 @@
+import org.redisson.Redisson;
+import org.redisson.api.RMap;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class RedissonBulkSaveExample {
+    public static void main(String[] args) {
+        // Configure Redisson client
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://127.0.0.1:6379");
+        RedissonClient redisson = Redisson.create(config);
+
+        // Get the map instance to save bulk data
+        RMap<String, String> map = redisson.getMap("bulk_map");
+
+        // Create a Map of key-value pairs to save
+        Map<String, String> bulkData = new HashMap<>();
+        bulkData.put("key1", "value1");
+        bulkData.put("key2", "value2");
+        bulkData.put("key3", "value3");
+
+        // Save the data into Redis using the putAll method
+        map.putAll(bulkData);
+
+        // Shutdown Redisson client
+        redisson.shutdown();
+    }
+}
