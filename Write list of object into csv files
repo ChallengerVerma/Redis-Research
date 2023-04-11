@@ -1,0 +1,28 @@
+import com.opencsv.CSVWriter;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.List;
+
+public class CsvWriter {
+  public static void writeCsv(String fileName, List<Person> people) throws IOException {
+    CSVWriter writer = new CSVWriter(new FileWriter(fileName));
+    
+    // Write CSV header
+    String[] header = {"id", "firstName", "lastName", "age", "personalStatement", "homeLocLat", "homeLocLon", "houseNumber", "street", "city", "state", "postalCode", "country", "skills"};
+    writer.writeNext(header);
+
+    // Write CSV data
+    for (Person person : people) {
+      String[] data = {person.getId(), person.getFirstName(), person.getLastName(), person.getAge().toString(),
+                       person.getPersonalStatement(), Double.toString(person.getHomeLoc().getX()),
+                       Double.toString(person.getHomeLoc().getY()), person.getAddress().getHouseNumber(),
+                       person.getAddress().getStreet(), person.getAddress().getCity(),
+                       person.getAddress().getState(), person.getAddress().getPostalCode(),
+                       person.getAddress().getCountry(), String.join(",", person.getSkills())};
+      writer.writeNext(data);
+    }
+
+    writer.close();
+  }
+}
