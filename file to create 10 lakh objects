@@ -1,0 +1,40 @@
+import com.github.javafaker.Faker;
+import org.springframework.data.geo.Point;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class PersonGenerator {
+    private static final Faker faker = new Faker();
+
+    public static List<Person> generate(int count) {
+        List<Person> people = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String firstName = faker.name().firstName();
+            String lastName = faker.name().lastName();
+            Integer age = faker.number().numberBetween(18, 80);
+            String personalStatement = faker.lorem().sentence();
+            Point homeLoc = new Point(faker.address().longitude(), faker.address().latitude());
+
+            String houseNumber = faker.address().buildingNumber();
+            String street = faker.address().streetName();
+            String city = faker.address().city();
+            String state = faker.address().state();
+            String postalCode = faker.address().zipCode();
+            String country = faker.address().country();
+
+            Address address = Address.of(houseNumber, street, city, state, postalCode, country);
+
+            Set<String> skills = new HashSet<>();
+            skills.add(faker.job().keySkill());
+            skills.add(faker.job().keySkill());
+            skills.add(faker.job().keySkill());
+
+            Person person = Person.of(firstName, lastName, age, personalStatement, homeLoc, address, skills);
+            people.add(person);
+        }
+        return people;
+    }
+}
