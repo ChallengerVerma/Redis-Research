@@ -1,0 +1,26 @@
+import org.redisson.Redisson;
+import org.redisson.api.RScript;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+
+import java.util.Arrays;
+
+public class RedissonFTSearchExample {
+
+    public static void main(String[] args) {
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://localhost:6379");
+
+        RedissonClient redisson = Redisson.create(config);
+
+        try {
+            RScript script = redisson.getScript();
+            String indexName = "myIndex";
+            String query = "@name:(hello world)";
+            Object result = script.eval(RScript.Mode.READ_ONLY, "return redis.call('FT.SEARCH', KEYS[1], ARGV[1]);", RScript.ReturnType.VALUE, Arrays.asList(indexName), query);
+            System.out.println(result);
+        } finally {
+            redisson.shutdown();
+        }
+    }
+}
