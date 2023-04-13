@@ -1,0 +1,43 @@
+import org.redisson.Redisson;
+import org.redisson.api.RFuture;
+import org.redisson.api.RedissonClient;
+import org.redisson.api.RScript;
+import org.redisson.client.codec.StringCodec;
+import org.redisson.codec.JsonJacksonCodec;
+
+public class RedissonCustomCodecExample {
+
+    public static void main(String[] args) {
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://localhost:6379");
+
+        RedissonClient redisson = Redisson.create(config);
+
+        try {
+            // Initialize a Redisson client instance with a custom codec
+            RedissonClient redisson = Redisson.create(config);
+            redisson.getKeys().flushdb();
+
+            // Register the custom codec with Redisson
+            redisson.getCodecRegistry().register(new JsonJacksonCodec());
+
+            // Initialize a Redisson RScript object
+            RScript rscript = redisson.getScript();
+
+            // Define the Lua script to execute
+            String script = "local results = redis.call('FT.SEARCH', 'myIndex', '@name:(hello world)')\n" +
+                            "return results\n";
+
+            // Execute the Lua script with the custom codec
+            RFuture<Object> future = rscript.eval(script, RScript.Mode.READ_ONLY, new String[]{}, new Object[]{}, new JsonJacksonCodec());
+
+            // Wait for the command to complete
+            Object result = future.get();
+            System.out.println(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            redisson.shutdown();
+        }
+    }
+}
