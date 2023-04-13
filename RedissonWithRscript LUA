@@ -1,0 +1,90 @@
+import java.util.Map;
+import org.redisson.Redisson;
+import org.redisson.api.RMap;
+import org.redisson.api.RedissonClient;
+import org.redisson.api.RedissonScript;
+import org.redisson.client.codec.StringCodec;
+import org.redisson.config.Config;
+
+public class EmployeeRedissonExample {
+
+    public static void main(String[] args) {
+        
+        // Create Redisson client
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://localhost:6379");
+        RedissonClient redisson = Redisson.create(config);
+
+        // Define a Redisson map for employee data
+        RMap<String, Employee> employeeMap = redisson.getMap("employees");
+
+        // Add employee objects to the map
+        Employee e1 = new Employee("John Doe", 35, "Sales");
+        employeeMap.put(e1.getName(), e1);
+        Employee e2 = new Employee("Jane Smith", 28, "Marketing");
+        employeeMap.put(e2.getName(), e2);
+        Employee e3 = new Employee("Bob Johnson", 42, "Engineering");
+        employeeMap.put(e3.getName(), e3);
+
+        // Create indexes using Redis FT.CREATE command
+        String indexName = "employeesByName";
+        RedissonScript createIndexScript = redisson.getScript(StringCodec.INSTANCE);
+        String createIndexCommand = "FT.CREATE " + indexName + " ON hash PREFIX 1 employees: SCHEMA name TEXT";
+        createIndexScript.eval(RedissonScript.Mode.READ_WRITE, createIndexCommand);
+
+        for (Map.Entry<String, Employee> entry : employeeMap.entrySet()) {
+            String name = entry.getKey();
+            Employee employee = entry.getValue();
+            String employeeJson = Json.encode(employee);
+
+            // Add employee data to the index using Redis FT.ADD command
+            RedissonScript addToIndexScript = redisson.getScript(StringCodec.INSTANCE);
+            String addToIndexCommand = "FT.ADD " + indexName + " " + name + " 1.0 FIELDS name " + name;
+            addToIndexScript.eval(RedissonScript.Mode.READ_WRITE, addToIndexCommand);
+        }
+
+        // Search for employees based on name using the index
+        String searchName = "John Doe";
+        RedissonScript searchScript = redisson.getScript(StringCodec.INSTANCE);
+        String searchCommand = "FT.SEARCH " + indexName + " \"" + searchName + "\" RETURN 1 name";
+        String searchResultJson = searchScript.eval(RedissonScript.Mode.READ_ONLY, searchCommand);
+        String[] searchResultFields = searchResultJson.split("\n");
+
+        if (searchResultFields.length > 2) {
+            String searchResultName = searchResultFields[2];
+            Employee searchResult = employeeMap.get(searchResultName);
+            System.out.println("Search result: " + searchResult.toString());
+        } else {
+            System.out.println("No search result found");
+        }
+
+        // Shutdown Redisson client
+        redisson.shutdown();
+    }
+    
+    private static class Employee {
+        private String name;
+        private int age;
+        private String department;
+        
+        public Employee(String name, int age, String department) {
+            this.name = name;
+            this.age = age;
+            this.department = department;
+        }
+        
+        public String getName() {
+            return name;
+        }
+        
+        public int getAge() {
+            return age;
+        }
+        
+        public String getDepartment() {
+            return department;
+        }
+        
+        public String toString() {
+            return "Employee(name=" + name + ", age=" + age + ", department=" + department + ")";
+       
