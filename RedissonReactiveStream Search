@@ -1,0 +1,109 @@
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.api.RLiveObjectService;
+import org.redisson.api.RLiveObjectReactiveStreams;
+import org.redisson.api.search.SearchOperator;
+import org.redisson.codec.TypedJsonJacksonCodec;
+import org.redisson.config.Config;
+import org.redisson.config.RedissonNodeConfig;
+import org.redisson.connection.AddressResolverGroupFactory;
+import org.redisson.connection.RandomAddressResolverGroupFactory;
+
+import io.netty.resolver.DefaultAddressResolverGroup;
+import io.netty.resolver.dns.DefaultDnsServerAddressStreamProvider;
+import io.netty.resolver.dns.DnsServerAddressStreamProviders;
+
+import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+
+public class RedissonReactiveSearchExample {
+
+    public static void main(String[] args) throws InterruptedException {
+
+        // Set up Redisson client configuration
+        Config config = new Config();
+        config.useSingleServer()
+            .setAddress("redis://127.0.0.1:6379")
+            .setCodec(new TypedJsonJacksonCodec());
+
+        // Create Redisson client instance
+        RedissonClient redissonClient = Redisson.create(config);
+
+        // Get the RLiveObjectService instance
+        RLiveObjectService liveObjectService = redissonClient.getLiveObjectService();
+
+        // Define a search query
+        RLiveObjectReactiveStreams<Person> reactiveStreams = liveObjectService.reactiveSearch(Person.class)
+                .where("name", "John")
+                .and("age", 30, SearchOperator.GREATER_THAN_OR_EQUAL_TO)
+                .reactive();
+
+        // Subscribe to the results stream and process them as they arrive
+        reactiveStreams.subscribe(new Subscriber<Person>() {
+            private Subscription subscription;
+            private int receivedCount;
+
+            @Override
+            public void onSubscribe(Subscription subscription) {
+                // Save the subscription object for later use
+                this.subscription = subscription;
+                // Request the first batch of results
+                subscription.request(10);
+            }
+
+            @Override
+            public void onNext(Person person) {
+                // Process the next result
+                System.out.println(person);
+                receivedCount++;
+                // Request more results if needed
+                if (receivedCount % 10 == 0) {
+                    subscription.request(10);
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                // Handle errors
+                throwable.printStackTrace();
+            }
+
+            @Override
+            public void onComplete() {
+                // All results have been received
+            }
+        });
+
+        // Wait for the search to complete
+        CountDownLatch latch = new CountDownLatch(1);
+        reactiveStreams.doOnComplete(() -> latch.countDown());
+        latch.await(10, TimeUnit.SECONDS);
+
+        // Shut down the Redisson client
+        redissonClient.shutdown();
+    }
+
+    // Define a simple POJO class to use for our Redisson object
+    public static class Person {
+        public String name;
+        public int age;
+
+        public Person(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        @Override
+        public String toString() {
+            return "Person{" +
+                    "name='" + name + '\'' +
+                    ", age=" + age +
+                    '}';
+        }
+    }
+}
