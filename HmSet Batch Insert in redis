@@ -1,0 +1,34 @@
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
+import java.util.HashMap;
+import java.util.Map;
+
+public class JedisPipelineExample {
+
+    public static void main(String[] args) {
+        Jedis jedis = new Jedis("localhost");
+        Pipeline pipeline = jedis.pipelined();
+
+        // Add 1 million employee records to Redis using pipeline
+        for (int i = 1; i <= 1000000; i++) {
+            // Create a new employee record
+            Map<String, String> employee = new HashMap<>();
+            employee.put("id", Integer.toString(i));
+            employee.put("name", "Employee " + i);
+            employee.put("age", Integer.toString(i % 100));
+
+            // Add the employee record to Redis using pipeline
+            pipeline.hmset("employees:" + i, employee);
+
+            // Execute the pipeline every 1000 records
+            if (i % 1000 == 0) {
+                pipeline.sync();
+            }
+        }
+
+        // Execute any remaining commands in the pipeline
+        pipeline.sync();
+
+        jedis.close();
+    }
+}
