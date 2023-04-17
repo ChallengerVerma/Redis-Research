@@ -1,0 +1,76 @@
+package com.example.lambda;
+
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.S3Event;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.event.S3EventNotification;
+import com.amazonaws.services.s3.model.*;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+public class LambdaFunctionHandler implements RequestHandler<S3Event, String> {
+
+    private final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
+
+    private static final String SOURCE_BUCKET_NAME = "source-bucket-name";
+    private static final String DESTINATION_BUCKET_NAME = "destination-bucket-name";
+
+    public String handleRequest(S3Event s3event, Context context) {
+        try {
+            S3EventNotification.S3EventNotificationRecord record = s3event.getRecords().get(0);
+            String srcBucket = record.getS3().getBucket().getName();
+            String srcKey = record.getS3().getObject().getKey();
+            S3Object s3Object = s3.getObject(new GetObjectRequest(srcBucket, srcKey));
+            InputStream inputStream = s3Object.getObjectContent();
+
+            List<String[]> rows = new ArrayList<>();
+            try (CSVReader csvReader = new CSVReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                String[] line;
+                while ((line = csvReader.readNext()) != null) {
+                    rows.add(line);
+                }
+            }
+
+            List<String[]> outputRows = processData(rows);
+
+            byte[] outputData;
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                try (CSVWriter csvWriter = new CSVWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+                    for (String[] outputRow : outputRows) {
+                        csvWriter.writeNext(outputRow);
+                    }
+                }
+                outputData = outputStream.toByteArray();
+            }
+
+            String destKey = srcKey.replace(".csv", "-processed.csv");
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(outputData.length);
+            s3.putObject(new PutObjectRequest(DESTINATION_BUCKET_NAME, destKey, new ByteArrayInputStream(outputData), metadata));
+            context.getLogger().log(String.format("Successfully processed S3 object s3://%s/%s and uploaded to s3://%s/%s", srcBucket, srcKey, DESTINATION_BUCKET_NAME, destKey));
+
+            return "Success";
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<String[]> processData(List<String[]> rows) {
+        // Process the data here
+        List<String[]> outputRows = new ArrayList<>();
+        for (String[] row : rows) {
+            String[] outputRow = new String[row.length + 1];
+            System.arraycopy(row, 0, outputRow, 0, row.length);
+            outputRow[row.length] = "Processed";
+            outputRows.add(outputRow);
+        }
+        return outputRows;
+    }
+}
