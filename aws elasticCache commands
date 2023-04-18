@@ -1,0 +1,1 @@
+aws elasticache describe-cache-clusters --cache-cluster-id <cluster-id> --show-cache-node-info | grep -A1 "CacheNodes" | grep "Address" | awk '{print $2}' | tr -d '"'
